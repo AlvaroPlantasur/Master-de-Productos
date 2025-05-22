@@ -1,4 +1,4 @@
-import os
+import os 
 import psycopg2
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font
@@ -26,8 +26,8 @@ def main():
         'port': db_port
     }
     
-    # 3. Consulta SQL con el rango dinámico
-    query = f"""
+    # 3. Consulta SQL
+    query = """
     SELECT 
     s.name AS "SECCIÓN",
     f.name AS "FAMILIA",
@@ -38,13 +38,11 @@ def main():
     COALESCE(pm.name, '') AS "MARCA",
     CASE WHEN p.en_pruebas = true THEN 'Sí' ELSE 'No' END AS "PRODUCTO PROPIO",
     CASE WHEN p.obsoleto = true THEN 'Sí' ELSE 'No' END AS "ARTICULO OBSOLETO"
- 
     FROM product_product p
     INNER JOIN product_category s ON s.id = p.seccion
     INNER JOIN product_category f ON f.id = p.familia
     INNER JOIN product_category sf ON sf.id = p.subfamilia
     LEFT JOIN product_marca pm ON pm.id = p.marca
-    
     WHERE p.active
     ORDER BY p.default_code;
     """
@@ -66,18 +64,19 @@ def main():
     else:
         print(f"Se obtuvieron {len(resultados)} filas de la consulta.")
     
-    # 5. Cargar el archivo base Portes.xlsx
+    # 5. Cargar el archivo base
     try:
         book = load_workbook(file_path)
         sheet = book.active
-        existing_invoice_codes = {row[2] for row in sheet.iter_rows(min_row=2, values_only=True) if row[2] is not None}
+        # Referencia está en la columna 4 → índice 3
+        existing_references = {row[3] for row in sheet.iter_rows(min_row=2, values_only=True) if row[3] is not None}
     except FileNotFoundError:
         print(f"No se encontró el archivo base '{file_path}'. Se aborta para no perder el formato.")
         return
 
-    # 6. Añadir nuevas filas sin duplicados
+    # 6. Añadir nuevas filas sin duplicados por REFERENCIA
     for row in resultados:
-        if row[2] not in existing_invoice_codes:
+        if row[3] not in existing_references:
             sheet.append(row)
             new_row_index = sheet.max_row
             if new_row_index > 1:
@@ -89,7 +88,7 @@ def main():
                     target_cell.border = copy.copy(source_cell.border)
                     target_cell.alignment = copy.copy(source_cell.alignment)
     
-    # 7. Actualizar referencia de la tabla "Productos"
+    # 7. Actualizar la tabla si existe
     if "Productos" in sheet.tables:
         tabla = sheet.tables["Productos"]
         max_row = sheet.max_row
@@ -101,9 +100,9 @@ def main():
     else:
         print("No se encontró la tabla 'Productos'. Se conservará el formato actual, pero no se actualizará la referencia de la tabla.")
     
-    # 8. Guardar archivo
+    # 8. Guardar el archivo
     book.save(file_path)
     print(f"Archivo guardado con la estructura de tabla en '{file_path}'.")
-    
+
 if __name__ == '__main__':
     main()
