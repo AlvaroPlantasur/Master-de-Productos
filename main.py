@@ -29,15 +29,15 @@ def main():
     # 3. Consulta SQL
     query = """
     SELECT 
-    s.name AS "SECCIÓN",
-    f.name AS "FAMILIA",
-    sf.name AS "SUBFAMILIA",
-    p.default_code AS "REFERENCIA",
-    p.name AS "NOMBRE",
-    p.default_code || '-' || p.name AS "ARTICULO",
-    COALESCE(pm.name, '') AS "MARCA",
-    CASE WHEN p.en_pruebas = true THEN 'Sí' ELSE 'No' END AS "PRODUCTO PROPIO",
-    CASE WHEN p.obsoleto = true THEN 'Sí' ELSE 'No' END AS "ARTICULO OBSOLETO"
+        s.name AS "SECCIÓN",
+        f.name AS "FAMILIA",
+        sf.name AS "SUBFAMILIA",
+        p.default_code AS "REFERENCIA",
+        p.name AS "NOMBRE",
+        p.default_code || '-' || p.name AS "ARTICULO",
+        COALESCE(pm.name, '') AS "MARCA",
+        CASE WHEN p.en_pruebas = true THEN 'Sí' ELSE 'No' END AS "PRODUCTO PROPIO",
+        CASE WHEN p.obsoleto = true THEN 'Sí' ELSE 'No' END AS "ARTICULO OBSOLETO"
     FROM product_product p
     INNER JOIN product_category s ON s.id = p.seccion
     INNER JOIN product_category f ON f.id = p.familia
@@ -68,16 +68,17 @@ def main():
     try:
         book = load_workbook(file_path)
         sheet = book.active
-        # Referencia está en la columna 4 → índice 3
-        existing_references = {row[3] for row in sheet.iter_rows(min_row=2, values_only=True) if row[3] is not None}
+        existing_keys = {(row[3], row[5]) for row in sheet.iter_rows(min_row=2, values_only=True) if row[3] and row[5]}
     except FileNotFoundError:
         print(f"No se encontró el archivo base '{file_path}'. Se aborta para no perder el formato.")
         return
 
-    # 6. Añadir nuevas filas sin duplicados por REFERENCIA
+    # 6. Añadir nuevas filas sin duplicados por (REFERENCIA, ARTICULO)
     for row in resultados:
-        if row[3] not in existing_references:
+        key = (row[3], row[5])
+        if key not in existing_keys:
             sheet.append(row)
+            existing_keys.add(key)
             new_row_index = sheet.max_row
             if new_row_index > 1:
                 for col in range(1, sheet.max_column + 1):
@@ -88,7 +89,7 @@ def main():
                     target_cell.border = copy.copy(source_cell.border)
                     target_cell.alignment = copy.copy(source_cell.alignment)
     
-    # 7. Actualizar la tabla si existe
+    # 7. Actualizar referencia de la tabla "Productos"
     if "Productos" in sheet.tables:
         tabla = sheet.tables["Productos"]
         max_row = sheet.max_row
@@ -100,7 +101,7 @@ def main():
     else:
         print("No se encontró la tabla 'Productos'. Se conservará el formato actual, pero no se actualizará la referencia de la tabla.")
     
-    # 8. Guardar el archivo
+    # 8. Guardar archivo
     book.save(file_path)
     print(f"Archivo guardado con la estructura de tabla en '{file_path}'.")
 
